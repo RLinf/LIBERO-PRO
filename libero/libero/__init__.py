@@ -1,4 +1,5 @@
 import os
+import warnings
 import yaml
 from filelock import FileLock
 
@@ -40,11 +41,6 @@ def get_default_path_dict(custom_location=None):
 def get_libero_path(query_key):
     with open(config_file, "r") as f:
         config = dict(yaml.load(f.read(), Loader=yaml.FullLoader))
-
-    # Give warnings in case the user needs to access the paths
-    for key in config:
-        if not os.path.exists(config[key]):
-            print(f"[Warning]: {key} path {config[key]} does not exist!")
 
     assert (
         query_key in config
