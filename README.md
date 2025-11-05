@@ -198,6 +198,26 @@ class TaskSuite(str, Enum):
   LIBERO_SPATIAL_TEMP = "libero_spatial_temp"
   LIBERO_10_TEMP = "libero_10_temp"
   LIBERO_OBJECT_TEMP = "libero_object_temp"
+  LIBERO_GOAL_LAN = "libero_goal_lan"
+  LIBERO_SPATIAL_LAN = "libero_spatial_lan"
+  LIBERO_10_LAN = "libero_10_lan"
+  LIBERO_OBJECT_LAN = "libero_object_lan"
+  LIBERO_GOAL_OBJECT = "libero_goal_object"
+  LIBERO_SPATIAL_OBJECT = "libero_spatial_object"
+  LIBERO_10_OBJECT = "libero_10_object"
+  LIBERO_OBJECT_OBJECT = "libero_object_object"
+  LIBERO_GOAL_SWAP = "libero_goal_swap"
+  LIBERO_SPATIAL_SWAP = "libero_spatial_swap"
+  LIBERO_10_SWAP = "libero_10_swap"
+  LIBERO_OBJECT_SWAP = "libero_object_swap"
+  LIBERO_GOAL_TASK = "libero_goal_task"
+  LIBERO_SPATIAL_TASK = "libero_spatial_task"
+  LIBERO_10_TASK = "libero_10_task"
+  LIBERO_OBJECT_TASK = "libero_object_task"
+  LIBERO_GOAL_ENV = "libero_goal_env"
+  LIBERO_SPATIAL_ENV = "libero_spatial_env"
+  LIBERO_10_ENV = "libero_10_env"
+  LIBERO_OBJECT_ENV = "libero_object_env"
 
 TASK_MAX_STEPS = {
   ...
@@ -205,6 +225,26 @@ TASK_MAX_STEPS = {
   TaskSuite.LIBERO_SPATIAL_TEMP: 220,
   TaskSuite.LIBERO_10_TEMP: 520,
   TaskSuite.LIBERO_OBJECT_TEMP: 280,
+  TaskSuite.LIBERO_GOAL_LAN: 300,
+  TaskSuite.LIBERO_SPATIAL_LAN: 220,
+  TaskSuite.LIBERO_10_LAN: 520,
+  TaskSuite.LIBERO_OBJECT_LAN: 280,
+  TaskSuite.LIBERO_GOAL_OBJECT: 300,
+  TaskSuite.LIBERO_SPATIAL_OBJECT: 220,
+  TaskSuite.LIBERO_10_OBJECT: 520,
+  TaskSuite.LIBERO_OBJECT_OBJECT: 280,
+  TaskSuite.LIBERO_GOAL_SWAP: 300,
+  TaskSuite.LIBERO_SPATIAL_SWAP: 220,
+  TaskSuite.LIBERO_10_SWAP: 520,
+  TaskSuite.LIBERO_OBJECT_SWAP: 280,
+  TaskSuite.LIBERO_GOAL_TASK: 300,
+  TaskSuite.LIBERO_SPATIAL_TASK: 220,
+  TaskSuite.LIBERO_10_TASK: 520,
+  TaskSuite.LIBERO_OBJECT_TASK: 280,
+  TaskSuite.LIBERO_GOAL_ENV: 300,
+  TaskSuite.LIBERO_SPATIAL_ENV: 220,
+  TaskSuite.LIBERO_10_ENV: 520,
+  TaskSuite.LIBERO_OBJECT_ENV: 280,
 }
 
 # Modify this line
@@ -216,18 +256,87 @@ def check_unnorm_key(cfg: GenerateConfig, model) -> None:
 # Modify this line
 def eval_libero(cfg: GenerateConfig) -> float:
   ...
-  with open(cfg.evaluation_config_path, "r", encoding="utf-8") as f:
-    evaluation_cfg = yaml.safe_load(f)
-  
-  evaluation_cfg["bddl_files_path"] = evaluation_cfg.get("bddl_files_path", "") + "/" + cfg.task_suite_name
-  evaluation_cfg["task_suite_name"] = cfg.task_suite_name
-  
-  if not os.path.exists(evaluation_cfg.get("init_file_dir", "") + cfg.task_suite_name + "_temp/"):
-    perturbation.create_env(
-      configs=evaluation_cfg,
-    )
-  
-  cfg.task_suite_name = cfg.task_suite_name + "_temp"
+      with open(cfg.evaluation_config_path, "r", encoding="utf-8") as f:
+        evaluation_cfg = yaml.safe_load(f)
+
+    evaluation_cfg["bddl_files_path"] = evaluation_cfg.get("bddl_files_path", "") + "/" + cfg.task_suite_name
+    evaluation_cfg["task_suite_name"] = cfg.task_suite_name
+
+    use_swap = evaluation_cfg.get("use_swap", False)
+    use_object = evaluation_cfg.get("use_object", False)
+    use_language = evaluation_cfg.get("use_language", False)
+    use_task = evaluation_cfg.get("use_task", False)
+    use_environment = evaluation_cfg.get("use_environment", False)
+
+    # Step 1: Check if only one of the use_xxx flags is True
+    if sum([use_swap, use_object, use_language, use_task, use_environment]) > 1:
+        # If more than one flag is True, use the temp environment
+        bddl_file_path = evaluation_cfg.get("bddl_files_path", "") + cfg.task_suite_name + "_temp/"
+
+        init_file_path = evaluation_cfg.get("init_file_dir", "") + cfg.task_suite_name + "_temp/"
+
+        # Check if the directories exist and the log.txt file contents match
+        if not os.path.exists(bddl_file_path) or not os.path.exists(init_file_path):
+            # If directories don't exist, create them and the log.txt file
+            os.makedirs(init_file_path, exist_ok=True)
+            os.makedirs(bddl_file_path, exist_ok=True)
+
+            # Create the log.txt dynamically based on current flag values
+            log_content = f"{use_swap},{use_object},{use_language},{use_task},{use_environment}"
+            with open(os.path.join(bddl_file_path, "log.txt"), "w") as log_file:
+                log_file.write(log_content)  # Write the dynamic state to the log file
+
+            perturbation.create_env(configs=evaluation_cfg)
+        else:
+            # If directories exist, check the contents of the log.txt file
+            with open(os.path.join(bddl_file_path, "log.txt"), "r") as log_file:
+                log_contents = log_file.read().strip()
+
+            # Define the expected log content based on the current flags
+            expected_log = f"{use_swap},{use_object},{use_language},{use_task},{use_environment}"
+
+            # If the log contents don't match, clean up and recreate the environment
+            if log_contents != expected_log:
+                # Remove existing files in both directories
+                for folder in [bddl_file_path, init_file_path]:
+                    for root, dirs, files in os.walk(folder, topdown=False):
+                        for name in files:
+                            os.remove(os.path.join(root, name))
+                        for name in dirs:
+                            os.rmdir(os.path.join(root, name))
+                # Create the environment again
+                os.makedirs(init_file_path, exist_ok=True)
+                os.makedirs(bddl_file_path, exist_ok=True)
+
+                # Write the updated log content based on current flags
+                with open(os.path.join(bddl_file_path, "log.txt"), "w") as log_file:
+                    log_file.write(expected_log)  # Write the updated log
+
+                perturbation.create_env(configs=evaluation_cfg)
+
+        # Update task_suite_name with "_temp" suffix
+        cfg.task_suite_name = cfg.task_suite_name + "_temp"
+
+    # Step 2: Handle the case when only one use_xxx flag is True
+    else:
+        if use_swap:
+            perturb_key = "use_swap"
+        elif use_object:
+            perturb_key = "use_object"
+        elif use_language:
+            perturb_key = "use_language"
+        elif use_task:
+            perturb_key = "use_task"
+        elif use_environment:
+            perturb_key = "use_environment"
+
+        init_file_path = evaluation_cfg.get("init_file_dir", "") + cfg.task_suite_name + "_" + evaluation_cfg.get(
+            "perturbation_mapping", {}).get(perturb_key, "")
+
+        if not os.path.exists(init_file_path):
+            perturbation.create_env(configs=evaluation_cfg)
+
+        cfg.task_suite_name = cfg.task_suite_name + "_" + evaluation_cfg.get("perturbation_mapping", {}).get(perturb_key, "")
   ...
 ```
 
