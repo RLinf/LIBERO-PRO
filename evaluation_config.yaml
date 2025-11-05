@@ -15,3 +15,9 @@ ood_task_configs:
   language: "./libero_ood/ood_language.yaml"
   task: "./libero_ood/ood_task.yaml"
 
+perturbation_mapping:
+  use_environment: env
+  use_swap: swap
+  use_object: object
+  use_language: lan
+  use_task: task
