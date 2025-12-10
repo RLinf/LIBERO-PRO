@@ -11,32 +11,7 @@ import numpy as np
 
 from pathlib import Path
 
-# import init_path
-from libero.libero import benchmark, get_libero_path
-
-
-# def render_task(task, bddl_file, init_states, demo_file):
-#     env_args = {
-#         "bddl_file_name": bddl_file,
-#         "camera_heights": 128,
-#         "camera_widths": 128
-#     }
-
-#     env = OffScreenRenderEnv(**env_args)
-#     env.reset()
-#     obs = env.set_init_state(init_states[0])
-#     for _ in range(5):
-#         obs, _, _, _ = env.step([0.] * 7)
-#     images = [obs["agentview_image"]]
-
-#     with h5py.File(demo_file, "r") as f:
-#         states = f["data/demo_0/states"][()]
-#         obs = env.set_init_state(states[-1])
-
-#     images.append(obs["agentview_image"])
-#     images = np.concatenate(images, axis=1)
-#     cv2.imwrite(f"benchmark_tasks/{task.problem}-{task.language}.png", images[::-1, :, ::-1])
-#     env.close()
+from liberopro.liberopro import benchmark, get_libero_path
 
 
 def main():

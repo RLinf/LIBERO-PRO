@@ -24,7 +24,7 @@ from pathlib import Path
 from tqdm import tqdm
 import argparse
 
-from libero.libero.envs import OffScreenRenderEnv
+from liberopro.liberopro.envs import OffScreenRenderEnv
 
 
 def generate_init_states(

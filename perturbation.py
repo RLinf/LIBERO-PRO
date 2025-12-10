@@ -8,14 +8,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 import subprocess
 
-
-# -----------------------------
-# 你已有的类：BDDLParser / 5个扰动器
-# （保持实现不变，直接复用你上面的代码）
-# -----------------------------
-
 class BDDLParser:
-    """解析BDDL文件并提取相关信息"""
+    """Parse BDDL files and extract relevant information."""
 
     def __init__(self, file_content: str):
         self.file_content = file_content
@@ -23,7 +17,7 @@ class BDDLParser:
         self.initial_states = self._parse_initial_states()
 
     def _parse_obj_of_interest(self) -> List[str]:
-        """解析感兴趣的物体"""
+        """Parse objects of interest."""
         obj_pattern = r'\(:obj_of_interest(.*?)\)'
         obj_match = re.search(obj_pattern, self.file_content, re.DOTALL)
         if not obj_match:
@@ -34,7 +28,7 @@ class BDDLParser:
 
     def _parse_initial_states(self) -> Dict[str, str]:
         """
-        解析 bddl (:init ...) 部分，返回 initial_states[obj] = region
+        Parse the BDDL (:init ...) section and return mapping initial_states[obj] = region.
         """
         initial_states = {}
         init_block_match = re.search(r"\(:init(.*?)(?=\)\s*\(:goal|\)\s*$)", self.file_content, re.S)
@@ -48,7 +42,7 @@ class BDDLParser:
 
 
 class SwapPerturbator:
-    """根据配置文件进行交换扰动"""
+    """Perform swap perturbations according to configuration."""
 
     def __init__(self, parser: BDDLParser, config_path: str):
         self.parser = parser
@@ -59,12 +53,12 @@ class SwapPerturbator:
         content = self.parser.file_content
         objs_interest = list(self.parser.objects_of_interest or [])
         if not objs_interest:
-            print("没有找到感兴趣物体")
+            print("No objects of interest found")
             return content
 
         task_cfg = self.config.get(task_suite_name, {}).get(task_name, None)
         if task_cfg is None:
-            print(f"任务 {task_name} 没有配置 allowed_swaps")
+            print(f"Task {task_name} has no allowed_swaps configured")
             return content
 
         init_states = dict(self.parser.initial_states)
@@ -95,7 +89,7 @@ class SwapPerturbator:
                 if x != obj and x in init_states and x not in used
             ]
             if not cand_pool:
-                print(f"[跳过] 感兴趣物体 {obj} 没有可用候选（可能未在 init 中或已被占用）")
+                print(f"[skip] Object of interest {obj} has no available candidates (maybe not in init or already used)")
                 continue
 
             swap_obj = random.choice(cand_pool)
@@ -103,7 +97,7 @@ class SwapPerturbator:
             reg_a = init_states.get(obj)
             reg_b = init_states.get(swap_obj)
             if not reg_a or not reg_b:
-                print(f"[跳过] {obj} 或 {swap_obj} 不在 init 中，无法交换")
+                print(f"[skip] {obj} or {swap_obj} not present in init, cannot swap")
                 continue
 
             pat_a = rf"\(On\s+{re.escape(obj)}\s+{re.escape(reg_a)}\s*\)"
@@ -117,19 +111,19 @@ class SwapPerturbator:
                 used.add(obj)
                 used.add(swap_obj)
                 pairs.append((obj, swap_obj))
-                print(f"任务 {task_name}: 已将 {obj} 与 {swap_obj} 交换位置")
+                print(f"Task {task_name}: swapped positions of {obj} and {swap_obj}")
             else:
-                print(f"[警告] {obj} 或 {swap_obj} 的 On 语句未匹配到，可能 BDDL 格式与正则不一致")
+                print(f"[warning] On statement for {obj} or {swap_obj} not matched; BDDL format may differ from regex expectations")
 
         if not pairs:
-            print("没有形成任何交换对，未修改文件")
+            print("No swap pairs formed; file not modified")
 
         return content
 
 
 class ObjectReplacePerturbator:
     """
-    根据 ood_object.yaml 进行“物体替换扰动”
+    Perform object replacement perturbations based on ood_object.yaml.
     """
 
     def __init__(self, parser: BDDLParser, config_path: str):
@@ -149,19 +143,19 @@ class ObjectReplacePerturbator:
         task_cfg: Dict[str, List[str]] = suite_cfg.get(task_name, {})
 
         if not task_cfg:
-            print(f"[物体替换] 任务 {task_name} 在配置中没有条目，跳过。")
+            print(f"[object replacement] Task {task_name} has no entry in config, skipping.")
             return self.parser.file_content
 
         mapping: Dict[str, str] = {}
         for obj_interest, candidates in task_cfg.items():
             if not candidates:
-                print(f"[物体替换] {obj_interest} 没有可替换候选，跳过。")
+                print(f"[object replacement] {obj_interest} has no replacement candidates, skipping.")
                 continue
             chosen = random.choice(candidates)
             mapping[obj_interest] = chosen
 
         if not mapping:
-            print("[物体替换] 没有形成任何替换映射，跳过。")
+            print("[object replacement] No replacement mappings formed, skipping.")
             return self.parser.file_content
 
         content = self.parser.file_content
@@ -181,14 +175,15 @@ class ObjectReplacePerturbator:
         new_content = prefix + language_block + suffix
 
         for k, v in mapping.items():
-            print(f"[物体替换] {task_name}: {k} -> {v}")
+            print(f"[object replacement] {task_name}: {k} -> {v}")
 
         return new_content
 
 
 class LanguagePerturbator:
     """
-    从 ood_language.yaml 读取候选指令文本，随机选择一条，替换 (:language ...)
+    Read candidate instruction texts from ood_language.yaml, choose one randomly,
+    and replace the (:language ...) block with it.
     """
 
     def __init__(self, parser: BDDLParser, config_path: str):
@@ -211,26 +206,27 @@ class LanguagePerturbator:
 
         candidates = (self.config.get(task_suite_name, {}) or {}).get(task_name, [])
         if not candidates:
-            print(f"[language扰动] 任务 {task_name} 在配置中没有候选，跳过。")
+            print(f"[language perturbation] Task {task_name} has no candidates in config, skipping.")
             return self.parser.file_content
 
         new_lang = random.choice(candidates)
 
         block = self._find_language_block(self.parser.file_content)
         if not block:
-            print("[language扰动] 未找到 (:language ...) 段，跳过。")
+            print("[language perturbation] No (:language ...) block found, skipping.")
             return self.parser.file_content
 
         s, e, old_inner = block
         new_content = self.parser.file_content[:s] + new_lang + self.parser.file_content[e:]
 
-        print(f"[language扰动] {task_name}: '{old_inner}' -> '{new_lang}'")
+        print(f"[language perturbation] {task_name}: '{old_inner}' -> '{new_lang}'")
         return new_content
 
 
 class TaskPerturbator:
     """
-    从 ood_task.yaml 读取候选任务，将 (:language ...) 与 (:goal ...) 同时替换，并替换 (:obj_of_interest ...)
+    Read candidate tasks from ood_task.yaml and replace (:language ...), (:goal ...)
+    and (:obj_of_interest ...) accordingly.
     """
 
     def __init__(self, parser: BDDLParser, config_path: str):
@@ -263,7 +259,7 @@ class TaskPerturbator:
     def _replace_language(self, text: str, new_lang: str) -> str:
         span = self._find_language_inner_span(text)
         if not span:
-            print("[TaskPerturbator] 未找到 (:language ...) 段，跳过 language 替换。")
+            print("[TaskPerturbator] No (:language ...) block found, skipping language replacement.")
             return text
         s, e, old = span
         print(f"[TaskPerturbator] language: '{old}' -> '{new_lang}'")
@@ -272,24 +268,24 @@ class TaskPerturbator:
     def _replace_goal(self, text: str, new_goal_expr: str) -> str:
         span = self._find_outer_block_span(text, "(:goal")
         if not span:
-            print("[TaskPerturbator] 未找到 (:goal ...) 段，跳过 goal 替换。")
+            print("[TaskPerturbator] No (:goal ...) block found, skipping goal replacement.")
             return text
         start, end = span
         replacement = "(:goal\n  " + new_goal_expr + "\n)"
-        print(f"[TaskPerturbator] goal: 替换为 {new_goal_expr}")
+        print(f"[TaskPerturbator] goal: replaced with {new_goal_expr}")
         return text[:start] + replacement + text[end:]
 
     def _replace_obj_of_interest(self, text: str, new_objs: list) -> str:
         span = self._find_outer_block_span(text, "(:obj_of_interest")
         if not span:
-            print("[TaskPerturbator] 未找到 (:obj_of_interest ...) 段，跳过替换。")
+            print("[TaskPerturbator] No (:obj_of_interest ...) block found, skipping replacement.")
             return text
         start, end = span
         replacement = "(:obj_of_interest\n"
         for obj in new_objs:
             replacement += f"  {obj}\n"
         replacement += ")"
-        print(f"[TaskPerturbator] obj_of_interest: 替换为 {new_objs}")
+        print(f"[TaskPerturbator] obj_of_interest: replaced with {new_objs}")
         return text[:start] + replacement + text[end:]
 
     def perturb(self, task_suite_name: str, task_name: str, seed: Optional[int] = None) -> str:
@@ -299,7 +295,7 @@ class TaskPerturbator:
         suite_cfg = self.config.get(task_suite_name, {})
         task_cfg = suite_cfg.get(task_name, {})
         if not task_cfg:
-            print(f"[TaskPerturbator] 任务 {task_name} 在配置中没有候选，跳过。")
+            print(f"[TaskPerturbator] Task {task_name} has no candidates in config, skipping.")
             return self.parser.file_content
 
         language_options = list(task_cfg.keys())
@@ -309,7 +305,7 @@ class TaskPerturbator:
         chosen_objs = chosen_cfg.get("obj_of_interest", [])
 
         if not chosen_goal:
-            print(f"[TaskPerturbator] 任务 {task_name} 的 language '{chosen_lang}' 没有 goal，跳过。")
+            print(f"[TaskPerturbator] Task {task_name} language '{chosen_lang}' has no goal, skipping.")
             return self.parser.file_content
 
         new_content = self.parser.file_content
@@ -321,7 +317,8 @@ class TaskPerturbator:
 
 class EnvironmentReplacePerturbator:
     """
-    环境替换扰动（全局直接替换）+ 修改 problem 名称场景标记 + 修正(:fixtures)右侧类型
+    Environment replacement perturbation (global replace), adjust problem name tokens
+    and fix types on the right side of (:fixtures).
     """
 
     def __init__(self, parser: BDDLParser, config_path: str):
@@ -344,7 +341,7 @@ class EnvironmentReplacePerturbator:
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f) or {}
 
-    def _extract_current_env(self, task_suite_name: str, task_name: str) -> Optional[str]:
+    def _extract_current_env(self, task_suite_name: str, task_name: str) -> str | None:
         suite_cfg = self.config.get(task_suite_name, {})
         entry = suite_cfg.get(task_name)
         if entry is None:
@@ -395,15 +392,15 @@ class EnvironmentReplacePerturbator:
 
         current_env = self._extract_current_env(task_suite_name, task_name)
         if not current_env:
-            print(f"[环境替换] 任务 {task_name} 未在配置中找到环境（或为空列表），跳过。")
+            print(f"[environment replacement] Task {task_name} has no configured environment (or empty list), skipping.")
             return self.parser.file_content
         if current_env not in self.ALLOWED_ENVS:
-            print(f"[环境替换] 配置环境 '{current_env}' 不在允许集合 {self.ALLOWED_ENVS} 中，跳过。")
+            print(f"[environment replacement] Configured environment '{current_env}' not in allowed set {self.ALLOWED_ENVS}, skipping.")
             return self.parser.file_content
 
         candidates = list(self.ALLOWED_ENVS - {current_env})
         if not candidates:
-            print("[环境替换] 无候选可替换环境，跳过。")
+            print("[environment replacement] No candidate environments to replace with, skipping.")
             return self.parser.file_content
 
         # new_env = random.choice(candidates)
@@ -414,12 +411,12 @@ class EnvironmentReplacePerturbator:
         if new_fix_type:
             new_content = self._rewrite_fixtures_type(new_content, new_env, new_fix_type)
 
-        print(f"[环境替换] {task_name}: {current_env} -> {new_env}")
+        print(f"[environment replacement] {task_name}: {current_env} -> {new_env}")
         return new_content
 
 
 # -----------------------------------------
-# 新增：组合扰动器（按布尔开关混合执行）
+# Combined perturbator (mix perturbations via boolean flags)
 # -----------------------------------------
 
 @dataclass
@@ -433,21 +430,21 @@ class PerturbFlags:
 
 class BDDLCombinedPerturbator:
     """
-    组合扰动器：
-    - 通过 PerturbFlags 指定哪些扰动启用
-    - 通过 configs 指定每种扰动的 YAML 路径
-      configs = {
-        "environment": "./ood_environment.yaml",
-        "swap": "./ood_spatial_relation.yaml",
-        "object": "./ood_object.yaml",
-        "language": "./ood_language.yaml",
-        "task": "./ood_task.yaml",
-      }
-    - 默认执行顺序：
+    Combined perturbator:
+    - Use PerturbFlags to indicate which perturbations are enabled.
+    - Use `configs` to provide YAML paths for each perturbator, e.g.:
+        configs = {
+            "environment": "./ood_environment.yaml",
+            "swap": "./ood_spatial_relation.yaml",
+            "object": "./ood_object.yaml",
+            "language": "./ood_language.yaml",
+            "task": "./ood_task.yaml",
+        }
+    - Default order of execution:
         environment -> object -> language -> task
-      但规则：
-        1) 若 use_swap=True，则 SwapPerturbator 必须最先执行
-        2) 若 use_task=True，其它扰动必须全为 False
+      Rules:
+        1) If use_swap=True, SwapPerturbator must run first.
+        2) If use_task=True, no other perturbations may be enabled.
     """
 
     def __init__(self, configs: Dict[str, str]):
@@ -462,7 +459,8 @@ class BDDLCombinedPerturbator:
                            call_kwargs: Dict[str, Any],
                            task_suite_name: str, task_name: str) -> str:
         """
-        用当前 content 构造 parser 和 perturbator，执行一次扰动；返回新的 content。
+        Construct a parser and perturbator from current content, apply one perturbation,
+        and return the new content.
         """
         parser = BDDLParser(content)
         perturbator = perturbator_cls(parser, cfg_path)
@@ -477,11 +475,11 @@ class BDDLCombinedPerturbator:
                         seed: Optional[int] = None) -> str:
         current = content
 
-        # 规则检查
-        # use_task 模式必须互斥
+        # Rule checks
+        # use_task mode must be exclusive
         if flags.use_task:
             if flags.use_environment or flags.use_swap or flags.use_object or flags.use_language:
-                raise ValueError("禁止在 use_task=True 时开启其它扰动！")
+                raise ValueError("Do not enable other perturbations when use_task=True")
 
         # 1) 若启用 swap，则必须最先执行
         if flags.use_swap:
@@ -491,7 +489,7 @@ class BDDLCombinedPerturbator:
                 perturbator = SwapPerturbator(parser, cfg)
                 current = perturbator.perturb(task_suite_name=task_suite_name, task_name=task_name)
             else:
-                print("[组合扰动] 缺少 swap 配置或路径不存在，跳过交换扰动。")
+                print("[combined perturbator] Missing swap config or path does not exist, skipping swap perturbation.")
 
         # 2) 其它扰动（按顺序执行）
         if flags.use_environment:
@@ -502,7 +500,7 @@ class BDDLCombinedPerturbator:
                     {"seed": seed}, task_suite_name, task_name
                 )
             else:
-                print("[组合扰动] 缺少 environment 配置或路径不存在，跳过环境替换。")
+                print("[combined perturbator] Missing environment config or path does not exist, skipping environment replacement.")
 
         if flags.use_object:
             cfg = self.configs.get("object")
@@ -512,7 +510,7 @@ class BDDLCombinedPerturbator:
                     {"seed": seed}, task_suite_name, task_name
                 )
             else:
-                print("[组合扰动] 缺少 object 配置或路径不存在，跳过物体替换。")
+                print("[combined perturbator] Missing object config or path does not exist, skipping object replacement.")
 
         if flags.use_language:
             cfg = self.configs.get("language")
@@ -522,7 +520,7 @@ class BDDLCombinedPerturbator:
                     {"seed": seed}, task_suite_name, task_name
                 )
             else:
-                print("[组合扰动] 缺少 language 配置或路径不存在，跳过语言替换。")
+                print("[combined perturbator] Missing language config or path does not exist, skipping language replacement.")
 
         # 3) 任务扰动（若启用，且保证其它都禁用）
         if flags.use_task:
@@ -533,7 +531,7 @@ class BDDLCombinedPerturbator:
                     {"seed": seed}, task_suite_name, task_name
                 )
             else:
-                print("[组合扰动] 缺少 task 配置或路径不存在，跳过任务替换。")
+                print("[combined perturbator] Missing task config or path does not exist, skipping task replacement.")
 
         return current
 
