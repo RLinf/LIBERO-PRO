@@ -19,11 +19,11 @@ from omegaconf import OmegaConf
 
 from liberopro.liberopro import get_libero_path
 from liberopro.liberopro.benchmark import get_benchmark
-from libero.lifelong.algos import get_algo_class, get_algo_list
-from libero.lifelong.models import get_policy_list
-from libero.lifelong.datasets import GroupedTaskDataset, SequenceVLDataset, get_dataset
-from libero.lifelong.metric import evaluate_loss, evaluate_success
-from libero.lifelong.utils import (
+from liberopro.lifelong.algos import get_algo_class, get_algo_list
+from liberopro.lifelong.models import get_policy_list
+from liberopro.lifelong.datasets import GroupedTaskDataset, SequenceVLDataset, get_dataset
+from liberopro.lifelong.metric import evaluate_loss, evaluate_success
+from liberopro.lifelong.utils import (
     NpEncoder,
     compute_flops,
     control_seed,
