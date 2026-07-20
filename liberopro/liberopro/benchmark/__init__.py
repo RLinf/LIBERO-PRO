@@ -117,6 +117,25 @@ libero_suites = [
 "libero_spatial_temp",
 "libero_10_temp",
 "libero_object_temp",
+# LIBERO-Pro perturbation variants (zhangyixian 2026-05-20).
+# swap=P2 Position, task=P1 Task, lan=Semantic, object=Object.
+# Includes all base/perturbation combinations provided by the HF assets.
+"libero_spatial_swap",
+"libero_spatial_task",
+"libero_spatial_lan",
+"libero_spatial_object",
+"libero_object_swap",
+"libero_object_task",
+"libero_object_lan",
+"libero_object_object",
+"libero_goal_swap",
+"libero_goal_task",
+"libero_goal_lan",
+"libero_goal_object",
+"libero_10_swap",
+"libero_10_task",
+"libero_10_lan",
+"libero_10_object",
 ]
 task_maps = {}
 max_len = 0
@@ -135,6 +154,34 @@ for libero_suite in libero_suites:
 
         # print(language, "\n", f"{task}.bddl", "\n")
         # print("")
+
+
+# --- Override task.language with the actual :language tag from each BDDL
+#     (zhangyixian 2026-05-20). The default `language` field was derived
+#     from the filename, which is wrong for LIBERO-Pro perturbations that
+#     edit the BDDL's :language tag (e.g. _task, _lan). Read the BDDL once
+#     at import time and override; idempotent for unchanged base suites. ---
+import re as _re
+
+_LANG_TAG_RE = _re.compile(r"\(:language\s+([^)]+)\)")
+_BDDL_ROOT = get_libero_path("bddl_files")
+for _suite_name, _suite_tasks in task_maps.items():
+    _suite_dir = os.path.join(_BDDL_ROOT, _suite_name)
+    if not os.path.isdir(_suite_dir):
+        continue
+    for _task_name, _task_obj in list(_suite_tasks.items()):
+        _bddl_path = os.path.join(_suite_dir, f"{_task_name}.bddl")
+        if not os.path.isfile(_bddl_path):
+            continue
+        try:
+            _txt = open(_bddl_path, "r").read()
+            _m = _LANG_TAG_RE.search(_txt)
+            if _m:
+                _actual_lang = _m.group(1).strip()
+                if _actual_lang and _actual_lang != _task_obj.language:
+                    _suite_tasks[_task_name] = _task_obj._replace(language=_actual_lang)
+        except Exception:
+            pass
 
 
 task_orders = [
@@ -717,3 +764,26 @@ class LIBERO_OBJECT_TEMP(Benchmark):
         super().__init__(task_order_index=task_order_index)
         self.name = "libero_object_temp"
         self._make_benchmark()
+
+
+# --- LIBERO-Pro perturbation benchmark classes (zhangyixian 2026-05-20) ---
+# Each class reuses the base suite's task list (filenames identical) but
+# reads bddl + init_states from its own per-perturbation subfolder.
+# Perturbations: swap=P2 Position, task=P1 Task, lan=Semantic, object=Object.
+
+def _make_perturbation_benchmark(suite_name):
+    cls_name = suite_name.upper()
+    def __init__(self, task_order_index=0):
+        Benchmark.__init__(self, task_order_index=task_order_index)
+        self.name = suite_name
+        self._make_benchmark()
+    cls = type(cls_name, (Benchmark,), {"__init__": __init__})
+    return cls
+
+for _suite in [
+    "libero_spatial_swap", "libero_spatial_task", "libero_spatial_lan", "libero_spatial_object",
+    "libero_object_swap", "libero_object_task", "libero_object_lan", "libero_object_object",
+    "libero_goal_swap", "libero_goal_task", "libero_goal_lan", "libero_goal_object",
+    "libero_10_swap", "libero_10_task", "libero_10_lan", "libero_10_object",
+]:
+    register_benchmark(_make_perturbation_benchmark(_suite))

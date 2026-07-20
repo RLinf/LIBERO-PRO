@@ -1149,3 +1149,15 @@ libero_task_map = {
     ],
 
 }
+
+# --- LIBERO-Pro perturbation aliases (zhangyixian 2026-05-20) ---
+# Each {base}_{perturb} suite has bddl/init filenames identical to its base
+# suite; only the file contents differ. So the task name list is shared.
+# Perturbation taxonomy (LIBERO-Pro paper):
+#   swap   - P2 Position Perturbation (object initial positions swapped)
+#   task   - P1 Task Perturbation (instruction + goal predicate changed)
+#   lan    - Semantic Perturbation (paraphrased instruction, same goal)
+#   object - Object Perturbation (appearance/colour/scale changes)
+for _base in ["libero_spatial", "libero_object", "libero_goal", "libero_10"]:
+    for _perturb in ["swap", "task", "lan", "object"]:
+        libero_task_map[f"{_base}_{_perturb}"] = libero_task_map[_base]
