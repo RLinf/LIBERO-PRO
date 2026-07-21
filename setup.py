@@ -12,7 +12,7 @@ lines = [x for x in lines if ".png" not in x]
 long_description = "".join(lines)
 
 setup(
-    name="liberopro",
+    name="rpent-liberopro",
     packages=[package for package in find_packages() if package.startswith("liberopro")],
     install_requires=[],
     eager_resources=["*"],
