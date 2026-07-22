@@ -250,3 +250,191 @@ def check_libero_dataset(download_dir=None):
         print(info_str)
         check_result = check_result and dataset_status
     return check_result
+
+
+# --------------------------------------------------------------------------- #
+# Assets (mesh / texture / scene files).
+#
+# The assets tree (~617MB) is too large to ship inside the PyPI wheel, so when
+# LIBERO-PRO is installed from PyPI it is downloaded separately from the Hugging
+# Face Hub into the package's `liberopro/liberopro/assets` directory (where the
+# environment code resolves asset files). Installs from a git checkout already
+# contain the assets and do not need this step.
+# --------------------------------------------------------------------------- #
+HF_ASSETS_REPO_ID = os.environ.get("LIBERO_PRO_ASSETS_REPO", "RLinf/LIBERO-PRO-assets")
+HF_ASSETS_REPO_TYPE = os.environ.get("LIBERO_PRO_ASSETS_REPO_TYPE", "dataset")
+
+# If set, `liberopro-download-assets` symlinks the package assets dir to this
+# already-downloaded assets tree instead of downloading (same as --link).
+LIBERO_ASSET_PATH_ENV = "LIBERO_PRO_ASSET_PATH"
+
+
+def _default_assets_dir():
+    """Where assets must live: the package's own assets directory.
+
+    Note: this is intentionally NOT read from the user config — most of the
+    environment code (objects, scenes, bddl domains) resolves asset files
+    relative to the installed package, so the package directory is the only
+    location that always works. Use ``libero_assets_link`` to point it at an
+    assets copy stored elsewhere.
+    """
+    from liberopro.liberopro import get_default_path_dict
+
+    return os.path.abspath(get_default_path_dict()["assets"])
+
+
+def assets_are_present(assets_dir=None):
+    """Return True if the assets directory looks populated (has scenes)."""
+    if assets_dir is None:
+        assets_dir = _default_assets_dir()
+    return os.path.isdir(os.path.join(assets_dir, "scenes"))
+
+
+def _link_assets_dir(assets_dir, snapshot_path):
+    """Make ``assets_dir`` a symlink pointing at the cached ``snapshot_path``."""
+    assets_dir = os.path.abspath(assets_dir)
+    os.makedirs(os.path.dirname(assets_dir), exist_ok=True)
+    if os.path.islink(assets_dir):
+        os.remove(assets_dir)
+    elif os.path.isdir(assets_dir):
+        if os.listdir(assets_dir):
+            print(
+                f"[Warning] Replacing existing assets directory {assets_dir} "
+                "with a symlink into the Hugging Face cache."
+            )
+            shutil.rmtree(assets_dir)
+        else:
+            os.rmdir(assets_dir)
+    os.symlink(snapshot_path, assets_dir)
+
+
+def libero_assets_link(existing_assets_dir, assets_dir=None):
+    """Point LIBERO-PRO at an already-downloaded assets directory (no download).
+
+    Creates a symlink at the package's assets location (where the environment
+    code looks for meshes/scenes) targeting ``existing_assets_dir``.
+    """
+    existing = os.path.abspath(os.path.expanduser(existing_assets_dir))
+    if not assets_are_present(existing):
+        raise FileNotFoundError(
+            f"{existing} does not look like a LIBERO-PRO assets tree "
+            "(missing a 'scenes' subdirectory)."
+        )
+    if assets_dir is None:
+        assets_dir = _default_assets_dir()
+    if os.path.realpath(assets_dir) == os.path.realpath(existing):
+        print(f"Assets already resolve to {existing}; nothing to do.")
+        return assets_dir
+    _link_assets_dir(assets_dir, existing)
+    print(f"LIBERO-PRO assets at {assets_dir} now point to {existing}")
+    return assets_dir
+
+
+def libero_assets_download(
+    assets_dir=None,
+    repo_id=None,
+    repo_type=None,
+    check_overwrite=True,
+    use_cache=True,
+):
+    """Download the LIBERO-PRO simulation assets from the Hugging Face Hub.
+
+    Args:
+        assets_dir (str, optional): Target directory. Defaults to the package's
+            ``liberopro/liberopro/assets`` directory.
+        repo_id (str, optional): Hub repo id hosting the assets. Defaults to
+            ``$LIBERO_PRO_ASSETS_REPO`` or ``RLinf/LIBERO-PRO-assets``.
+        repo_type (str, optional): "dataset" (default) or "model".
+        check_overwrite (bool, optional): Prompt before re-downloading when the
+            assets already appear to be present. Defaults to True.
+        use_cache (bool, optional): Download into the shared Hugging Face cache
+            (respects ``HF_HOME``; resumable, deduped across environments) and
+            expose it at ``assets_dir`` via a symlink. Set False to place a
+            plain copy directly in ``assets_dir`` instead. Defaults to True.
+    """
+    if not HUGGINGFACE_AVAILABLE:
+        raise ImportError(
+            "Hugging Face Hub is not available. Install it with "
+            "'pip install huggingface_hub'"
+        )
+
+    if assets_dir is None:
+        assets_dir = _default_assets_dir()
+    repo_id = repo_id or HF_ASSETS_REPO_ID
+    repo_type = repo_type or HF_ASSETS_REPO_TYPE
+
+    if check_overwrite and assets_are_present(assets_dir):
+        user_response = input(
+            f"Assets already present at {assets_dir}. Re-download? y/n\n"
+        )
+        if user_response.lower() not in {"yes", "y"}:
+            print("Skipping asset download.")
+            return assets_dir
+
+    print(f"Downloading LIBERO-PRO assets from '{repo_id}' into {assets_dir} ...")
+    try:
+        if use_cache:
+            snapshot_path = snapshot_download(repo_id=repo_id, repo_type=repo_type)
+            _link_assets_dir(assets_dir, snapshot_path)
+        else:
+            os.makedirs(assets_dir, exist_ok=True)
+            snapshot_download(
+                repo_id=repo_id,
+                repo_type=repo_type,
+                local_dir=assets_dir,
+            )
+    except Exception as e:  # noqa: BLE001 - surface a clear, actionable message
+        raise RuntimeError(
+            f"Failed to download assets from '{repo_id}' (type '{repo_type}').\n"
+            f"Original error: {e}\n"
+            "Set LIBERO_PRO_ASSETS_REPO to a valid Hugging Face repo that hosts "
+            "the LIBERO-PRO assets tree, or install LIBERO-PRO from a git "
+            "checkout that already contains liberopro/liberopro/assets."
+        ) from e
+
+    print(f"LIBERO-PRO assets ready at {assets_dir}")
+    return assets_dir
+
+
+def _assets_cli():
+    """Console entry point: ``liberopro-download-assets``."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Download LIBERO-PRO simulation assets from the Hugging Face Hub."
+    )
+    parser.add_argument("--assets-dir", type=str, default=None,
+                        help="Target directory (default: the package assets dir).")
+    parser.add_argument("--repo-id", type=str, default=None,
+                        help=f"HF repo id (default: {HF_ASSETS_REPO_ID}).")
+    parser.add_argument("--repo-type", type=str, default=None,
+                        choices=["dataset", "model"])
+    parser.add_argument("--force", action="store_true",
+                        help="Re-download even if assets already exist.")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="Place a plain copy in the assets dir instead of "
+                             "symlinking into the shared Hugging Face cache.")
+    parser.add_argument("--link", type=str, default=None, metavar="EXISTING_DIR",
+                        help="Skip downloading; symlink the package assets dir "
+                             "to an assets tree that already exists at this path. "
+                             f"Falls back to ${LIBERO_ASSET_PATH_ENV} if set.")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="Exit without prompting if assets are already "
+                             "present (for non-interactive installs).")
+    args = parser.parse_args()
+    if args.skip_existing and assets_are_present(args.assets_dir):
+        print("LIBERO-PRO assets already present; skipping download.")
+        return
+    link_target = args.link or os.environ.get(LIBERO_ASSET_PATH_ENV)
+    if link_target:
+        if args.link is None:
+            print(f"Using {LIBERO_ASSET_PATH_ENV}={link_target}")
+        libero_assets_link(link_target, assets_dir=args.assets_dir)
+        return
+    libero_assets_download(
+        assets_dir=args.assets_dir,
+        repo_id=args.repo_id,
+        repo_type=args.repo_type,
+        check_overwrite=not args.force,
+        use_cache=not args.no_cache,
+    )
