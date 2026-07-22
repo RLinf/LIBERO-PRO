@@ -45,21 +45,50 @@ ______________________________________________________________________
 - [License](#License)
 
 
-# Installtion
-Please run the following commands in the given order to install the dependency for **LIBERO**.
+# Installation
+
+### Option A — install from PyPI (`rlinf-libero`)
+
+```
+pip install rlinf-libero
+```
+
+The PyPI wheel ships the code plus the small `bddl_files` / `init_files` data,
+but **not** the ~405MB of mesh/texture assets (they exceed PyPI's 100MB limit).
+After installing, download the assets once:
+
+```
+libero-download-assets
+```
+
+This fetches the assets from the Hugging Face Hub into the installed package's
+`libero/libero/assets` directory. To point at a different source repo, pass
+`--repo-id <org>/<repo>` or set the `LIBERO_ASSETS_REPO` environment variable.
+
+### Option B — install from source (editable)
+
+A git checkout already contains the assets, so no separate download is needed
+(this is the flow RLinf uses):
+
 ```
 conda create -n libero python=3.8.13
 conda activate libero
-git clone https://github.com/Lifelong-Robot-Learning/LIBERO.git
+git clone https://github.com/RLinf/LIBERO.git
 cd LIBERO
-pip install -r requirements.txt
-pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113
-```
-
-Then install the `libero` package:
-```
 pip install -e .
 ```
+
+Add the lifelong-learning training stack (needed only for `libero.lifelong.*`)
+with the `train` extra:
+
+```
+pip install -e ".[train]"
+```
+
+> **Note on PyTorch.** `torch` is left unpinned so it defers to whatever build
+> you already have installed (e.g. a CUDA build from the PyTorch index). Install
+> the torch/torchvision build matching your CUDA version before or after
+> installing LIBERO if you need GPU support.
 
 # Datasets
 We provide high-quality human teleoperation demonstrations for the four task suites in **LIBERO**. To download the demonstration dataset, run:
@@ -85,6 +114,32 @@ python benchmark_scripts/download_libero_datasets.py --datasets DATASET --use-hu
 ```
 
 The datasets hosted on HuggingFace are available at [here](https://huggingface.co/datasets/yifengzhu-hf/LIBERO-datasets).
+
+# Assets
+
+The simulation assets (meshes, textures, scenes; ~405MB) live under
+`libero/libero/assets`. They are included in a git checkout but excluded from the
+PyPI wheel. To download them into an installed package:
+
+```
+libero-download-assets                 # into the package assets dir
+libero-download-assets --repo-id ORG/REPO --force
+```
+
+or, from a source tree:
+
+```
+python benchmark_scripts/download_libero_assets.py
+```
+
+**For maintainers publishing `rlinf-libero`:** the assets must be hosted on a
+Hugging Face repo (default `RLinf/LIBERO-assets`). Create it once and upload the
+tree from a checkout that has the assets:
+
+```
+huggingface-cli repo create RLinf/LIBERO-assets --repo-type dataset
+huggingface-cli upload RLinf/LIBERO-assets libero/libero/assets . --repo-type dataset
+```
 
 
 # Getting Started

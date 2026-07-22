@@ -202,6 +202,144 @@ def libero_dataset_download(datasets="all", download_dir=None, check_overwrite=T
             )
 
 
+# --------------------------------------------------------------------------- #
+# Assets (mesh / texture / scene files).
+#
+# The assets tree (~405MB) is too large to ship inside the PyPI wheel, so when
+# LIBERO is installed from PyPI it is downloaded separately from the Hugging Face
+# Hub into the package's `libero/libero/assets` directory (the path the config
+# points at by default). Override the source repo with the LIBERO_ASSETS_REPO
+# environment variable. Installs from a git checkout already contain the assets
+# and do not need this step.
+# --------------------------------------------------------------------------- #
+HF_ASSETS_REPO_ID = os.environ.get("LIBERO_ASSETS_REPO", "RLinf/LIBERO-assets")
+HF_ASSETS_REPO_TYPE = os.environ.get("LIBERO_ASSETS_REPO_TYPE", "dataset")
+
+
+def _default_assets_dir():
+    """Where assets should live: the configured `assets` path if available
+    (this is what the environments read at runtime), otherwise the package's
+    own assets directory."""
+    from libero.libero import get_default_path_dict
+
+    try:
+        return get_libero_path("assets")
+    except Exception:  # noqa: BLE001 - config missing/incomplete -> fall back
+        return get_default_path_dict()["assets"]
+
+
+def assets_are_present(assets_dir=None):
+    """Return True if the assets directory looks populated (has scenes)."""
+    if assets_dir is None:
+        assets_dir = _default_assets_dir()
+    return os.path.isdir(os.path.join(assets_dir, "scenes"))
+
+
+def libero_assets_download(
+    assets_dir=None,
+    repo_id=None,
+    repo_type=None,
+    check_overwrite=True,
+):
+    """Download the LIBERO simulation assets from the Hugging Face Hub.
+
+    Args:
+        assets_dir (str, optional): Target directory. Defaults to the package's
+            ``libero/libero/assets`` directory, which is what the LIBERO config
+            resolves ``assets`` to out of the box.
+        repo_id (str, optional): Hub repo id hosting the assets. Defaults to
+            ``$LIBERO_ASSETS_REPO`` or ``RLinf/LIBERO-assets``.
+        repo_type (str, optional): "dataset" (default) or "model".
+        check_overwrite (bool, optional): Prompt before re-downloading when the
+            assets already appear to be present. Defaults to True.
+    """
+    if not HUGGINGFACE_AVAILABLE:
+        raise ImportError(
+            "Hugging Face Hub is not available. Install it with "
+            "'pip install huggingface_hub'"
+        )
+
+    if assets_dir is None:
+        assets_dir = _default_assets_dir()
+    repo_id = repo_id or HF_ASSETS_REPO_ID
+    repo_type = repo_type or HF_ASSETS_REPO_TYPE
+
+    if check_overwrite and assets_are_present(assets_dir):
+        user_response = input(
+            f"Assets already present at {assets_dir}. Re-download? y/n\n"
+        )
+        if user_response.lower() not in {"yes", "y"}:
+            print("Skipping asset download.")
+            return assets_dir
+
+    os.makedirs(assets_dir, exist_ok=True)
+    print(f"Downloading LIBERO assets from '{repo_id}' into {assets_dir} ...")
+    try:
+        snapshot_download(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            local_dir=assets_dir,
+            local_dir_use_symlinks=False,
+        )
+    except Exception as e:  # noqa: BLE001 - surface a clear, actionable message
+        raise RuntimeError(
+            f"Failed to download assets from '{repo_id}' (type '{repo_type}').\n"
+            f"Original error: {e}\n"
+            "Set LIBERO_ASSETS_REPO to a valid Hugging Face repo that hosts the "
+            "LIBERO assets tree, or install LIBERO from a git checkout that "
+            "already contains libero/libero/assets."
+        ) from e
+
+    print(f"LIBERO assets ready at {assets_dir}")
+    return assets_dir
+
+
+def _datasets_cli():
+    """Console entry point: ``libero-download-datasets``."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Download LIBERO datasets.")
+    parser.add_argument("--download-dir", type=str, default=None)
+    parser.add_argument(
+        "--datasets",
+        type=str,
+        default="all",
+        choices=["all", "libero_goal", "libero_spatial", "libero_object", "libero_100"],
+    )
+    parser.add_argument("--no-huggingface", action="store_true",
+                        help="Use the original (Box) download links instead of HF.")
+    args = parser.parse_args()
+    libero_dataset_download(
+        datasets=args.datasets,
+        download_dir=args.download_dir,
+        use_huggingface=not args.no_huggingface,
+    )
+
+
+def _assets_cli():
+    """Console entry point: ``libero-download-assets``."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Download LIBERO simulation assets from the Hugging Face Hub."
+    )
+    parser.add_argument("--assets-dir", type=str, default=None,
+                        help="Target directory (default: the package assets dir).")
+    parser.add_argument("--repo-id", type=str, default=None,
+                        help=f"HF repo id (default: {HF_ASSETS_REPO_ID}).")
+    parser.add_argument("--repo-type", type=str, default=None,
+                        choices=["dataset", "model"])
+    parser.add_argument("--force", action="store_true",
+                        help="Re-download even if assets already exist.")
+    args = parser.parse_args()
+    libero_assets_download(
+        assets_dir=args.assets_dir,
+        repo_id=args.repo_id,
+        repo_type=args.repo_type,
+        check_overwrite=not args.force,
+    )
+
+
 def check_libero_dataset(download_dir=None):
     """Check the integrity of the downloaded datasets.
 

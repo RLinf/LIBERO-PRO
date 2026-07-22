@@ -1,0 +1,100 @@
+[build-system]
+requires = ["setuptools>=64.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rlinf-libero"
+version = "0.1.0"
+description = "LIBERO: Benchmark and simulation environments for lifelong robot learning (RLinf distribution)"
+authors = [
+    { name = "Bo Liu" },
+    { name = "Yifeng Zhu" },
+    { name = "Chongkai Gao" },
+    { name = "Yihao Feng" },
+    { name = "Qiang Liu" },
+    { name = "Yuke Zhu" },
+    { name = "Peter Stone" },
+]
+maintainers = [
+    { name = "RLinf Team" },
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["robotics", "reinforcement-learning", "simulation", "benchmark", "libero", "rlinf"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Core runtime dependencies: everything required to import `libero` and run the
+# simulation environments. Heavy / version-sensitive training stacks live in the
+# optional `[train]` extra so the environment package stays light and does not
+# fight RLinf's own torch/transformers pinning.
+dependencies = [
+    # --- simulator core ---
+    "robosuite>=1.4.0,<1.5.0",
+    "bddl",
+    "mujoco>=3.0.0,<3.9.0",
+    "gym>=0.25,<0.27",
+
+    # --- numerics / io (imported at env runtime) ---
+    "numpy>=1.22,<2",
+    "imageio",
+    "opencv-python",
+    "matplotlib>=3.5.3",
+    "termcolor",
+    "tqdm",
+    "easydict",
+    "cloudpickle>=2.0.0",
+
+    # --- config / packaging plumbing ---
+    "PyYAML",
+    "filelock",
+
+    # --- dataset & asset download from the Hugging Face Hub ---
+    "huggingface-hub",
+]
+
+[project.optional-dependencies]
+# Lifelong-learning training stack (libero.lifelong.*). Not needed to run the
+# simulation environments; install with `pip install rlinf-libero[train]`.
+train = [
+    "hydra-core>=1.2,<1.4",
+    "robomimic==0.2.0",
+    "transformers",
+    "torchvision",
+    "wandb",
+    "thop",
+    "einops",
+    "omegaconf",
+]
+
+[project.scripts]
+libero-download-datasets = "libero.libero.utils.download_utils:_datasets_cli"
+libero-download-assets = "libero.libero.utils.download_utils:_assets_cli"
+
+[project.urls]
+Homepage = "https://github.com/RLinf/LIBERO"
+Issues = "https://github.com/RLinf/LIBERO/issues"
+
+# --------------------------------------------------------------------------- #
+# Packaging: ship code + small data (bddl_files, init_files); the ~405MB of mesh
+# / texture assets are DELIBERATELY excluded (PyPI's 100MB artifact limit) and
+# fetched post-install via `libero-download-assets`.
+# --------------------------------------------------------------------------- #
+[tool.setuptools.packages.find]
+include = ["libero*"]
+
+[tool.setuptools]
+# Only ship the data files explicitly listed below; do not sweep in everything
+# under version control (which would drag the assets tree back in).
+include-package-data = false
+
+[tool.setuptools.package-data]
+"libero.libero" = [
+    "bddl_files/**/*",
+    "init_files/**/*",
+]
