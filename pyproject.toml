@@ -3,8 +3,8 @@ requires = ["setuptools>=64.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rlinf-liberopro"
-version = "0.1.1"
+name = "rpent-liberopro"
+version = "0.1.0"
 description = "LIBERO-PRO: extended LIBERO benchmark environments (RLinf distribution)"
 license = { text = "MIT" }
 readme = "README.md"
