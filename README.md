@@ -126,6 +126,17 @@ libero-download-assets                 # into the package assets dir
 libero-download-assets --repo-id ORG/REPO --force
 ```
 
+If the assets already exist somewhere on disk (a shared volume, another
+checkout), skip the download and symlink the package at them — either
+explicitly or via the `LIBERO_ASSET_PATH` environment variable:
+
+```
+libero-download-assets --link /path/to/existing/assets
+# or
+export LIBERO_ASSET_PATH=/path/to/existing/assets
+libero-download-assets
+```
+
 or, from a source tree:
 
 ```
