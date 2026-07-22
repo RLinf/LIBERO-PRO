@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=64.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rlinf-liberopro"
+version = "0.1.1"
+description = "LIBERO-PRO: extended LIBERO benchmark environments (RLinf distribution)"
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["robotics", "reinforcement-learning", "simulation", "benchmark", "libero", "rlinf"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "rlinf-libero",
+
+    # --- simulator core ---
+    "robosuite>=1.4.0,<1.5.0",
+    "bddl",
+    "mujoco>=3.0.0,<3.9.0",
+    "gym>=0.25,<0.27",
+
+    # --- numerics / io (imported at env runtime) ---
+    "numpy>=1.22,<2",
+    "imageio",
+    "opencv-python",
+    "matplotlib>=3.5.3",
+    "termcolor",
+    "tqdm",
+    "easydict",
+    "cloudpickle>=2.0.0",
+
+    # --- config / packaging plumbing ---
+    "PyYAML",
+    "filelock",
+
+    # --- asset download from the Hugging Face Hub ---
+    "huggingface-hub",
+]
+
+[project.optional-dependencies]
+train = [
+    "hydra-core>=1.2,<1.4",
+    "robomimic==0.2.0",
+    "transformers",
+    "torchvision",
+    "wandb",
+    "thop",
+    "einops",
+    "omegaconf",
+]
+
+[project.scripts]
+liberopro-download-assets = "liberopro.liberopro.utils.download_utils:_assets_cli"
+
+[project.urls]
+Homepage = "https://github.com/RLinf/LIBERO-PRO"
+Issues = "https://github.com/RLinf/LIBERO-PRO/issues"
+
+[tool.setuptools.packages.find]
+include = ["liberopro*"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.package-data]
+"liberopro.liberopro" = [
+    "bddl_files/**/*",
+    "init_files/**/*",
+]

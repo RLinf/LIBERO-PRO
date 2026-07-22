@@ -1,8 +1,11 @@
-# Ship the benchmark data alongside the package so a non-editable
-# `pip install git+...` (as used by RPent's optional-dependencies) bundles
-# the bddl task definitions, pruned init states, and simulation assets into
-# the built wheel. Without this, include_package_data has nothing to pick up
-# and the installed package renders empty benchmarks.
+# Data shipped inside the wheel/sdist. The large mesh/texture assets under
+# liberopro/liberopro/assets are intentionally NOT included (PyPI 100MB limit)
+# and are downloaded after install with `liberopro-download-assets`.
 recursive-include liberopro/liberopro/bddl_files *
 recursive-include liberopro/liberopro/init_files *
-recursive-include liberopro/liberopro/assets *
+
+# Never package the assets tree.
+prune liberopro/liberopro/assets
+
+global-exclude *.py[cod]
+global-exclude __pycache__

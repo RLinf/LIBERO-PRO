@@ -15,5 +15,8 @@ logs/
 
 *.mp4
 libero.egg-info/
+*.egg-info/
+build/
+dist/
 .vscode/
 *.egg-info/
