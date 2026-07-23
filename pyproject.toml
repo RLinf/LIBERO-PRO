@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rpent-liberopro"
-version = "0.1.0"
+version = "0.1.1"
 description = "LIBERO-PRO: extended LIBERO benchmark environments (RLinf distribution)"
 license = { text = "MIT" }
 readme = "README.md"
@@ -29,6 +29,7 @@ dependencies = [
     # --- numerics / io (imported at env runtime) ---
     "numpy>=1.22,<2",
     "imageio",
+    "h5py",
     "opencv-python",
     "matplotlib>=3.5.3",
     "termcolor",
