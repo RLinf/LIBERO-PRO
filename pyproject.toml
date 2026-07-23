@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlinf-libero"
-version = "0.1.0"
+version = "0.1.1"
 description = "LIBERO: Benchmark and simulation environments for lifelong robot learning (RLinf distribution)"
 authors = [
     { name = "Bo Liu" },
@@ -43,6 +43,7 @@ dependencies = [
     # --- numerics / io (imported at env runtime) ---
     "numpy>=1.22,<2",
     "imageio",
+    "h5py",
     "opencv-python",
     "matplotlib>=3.5.3",
     "termcolor",
