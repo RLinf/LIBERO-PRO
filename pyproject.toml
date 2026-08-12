@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rpent-liberopro"
-version = "0.1.1"
+version = "0.2.0"
 description = "LIBERO-PRO: extended LIBERO benchmark environments (RLinf distribution)"
 license = { text = "MIT" }
 readme = "README.md"
@@ -18,16 +18,17 @@ classifiers = [
 ]
 
 dependencies = [
-    "rlinf-libero",
+    # rpent-libero, not rlinf-libero: the latter stays on robosuite 1.4.
+    "rpent-libero>=0.2.0",
 
     # --- simulator core ---
-    "robosuite>=1.4.0,<1.5.0",
+    "robosuite>=1.5.2",
     "bddl",
-    "mujoco>=3.0.0,<3.9.0",
+    "mujoco>=3.3,<3.10",
     "gym>=0.25,<0.27",
 
     # --- numerics / io (imported at env runtime) ---
-    "numpy>=1.22,<2",
+    "numpy>=1.22",
     "imageio",
     "h5py",
     "opencv-python",

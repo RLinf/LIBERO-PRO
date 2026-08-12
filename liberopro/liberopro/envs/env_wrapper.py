@@ -44,7 +44,17 @@ class ControlEnv:
             bddl_file_name
         ), f"[error] {bddl_file_name} does not exist!"
 
-        controller_configs = suite.load_controller_config(default_controller=controller)
+        # robosuite 1.5 nests the arm controller inside a composite config:
+        # OSC_POSE is a *part* controller now, not a top-level one. Load the
+        # robot default (BASIC composite, OSC_POSE arm) and set the arm part
+        # to whatever the caller asked for.
+        robot_name = robots[0] if isinstance(robots, (list, tuple)) else robots
+        controller_configs = suite.load_composite_controller_config(
+            controller=None, robot=robot_name
+        )
+        if controller is not None:
+            for part_cfg in controller_configs.get("body_parts", {}).values():
+                part_cfg["type"] = controller
 
         problem_info = BDDLUtils.get_problem_info(bddl_file_name)
         # Check if we're using a multi-armed environment and use env_configuration argument if so
@@ -131,7 +141,15 @@ class ControlEnv:
         self.env.reset_from_xml_string(xml_string)
 
     def seed(self, seed):
-        self.env.seed(seed)
+        # robosuite 1.5 takes the seed in the constructor and exposes it as an
+        # attribute; 1.4 had a seed() method.
+        if callable(getattr(self.env, "seed", None)):
+            self.env.seed(seed)
+            return
+        import numpy as _np
+
+        self.env.seed = seed
+        self.env.rng = _np.random.default_rng(seed)
 
     def set_init_state(self, init_state):
         return self.regenerate_obs_from_state(init_state)

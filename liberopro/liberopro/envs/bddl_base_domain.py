@@ -3,7 +3,7 @@ import os
 import robosuite.utils.transform_utils as T
 
 from copy import deepcopy
-from robosuite.environments.manipulation.single_arm_env import SingleArmEnv
+from robosuite.environments.manipulation.manipulation_env import ManipulationEnv
 from robosuite.models.tasks import ManipulationTask
 from robosuite.utils.placement_samplers import SequentialCompositeSampler
 from robosuite.utils.observables import Observable, sensor
@@ -34,7 +34,7 @@ def register_problem(target_class):
 import time
 
 
-class BDDLBaseDomain(SingleArmEnv):
+class BDDLBaseDomain(ManipulationEnv):
     """
     A base domain for parsing bddl files.
     """
@@ -136,7 +136,7 @@ class BDDLBaseDomain(SingleArmEnv):
             robots=robots,
             env_configuration=env_configuration,
             controller_configs=controller_configs,
-            mount_types="default",
+            base_types="default",
             gripper_types=gripper_types,
             initialization_noise=initialization_noise,
             use_camera_obs=use_camera_obs,
@@ -432,6 +432,14 @@ class BDDLBaseDomain(SingleArmEnv):
             OrderedDict: Dictionary mapping observable names to its corresponding Observable object
         """
         observables = super()._setup_observables()
+
+        # robosuite 1.5 adds two proprio observables that 1.4 did not have.
+        # Left enabled they extend robot0_proprio-state from 39 to 50 dims,
+        # which silently invalidates policies trained on the 1.4 observation.
+        for _name in ("robot0_joint_acc", "robot0_eef_quat_site"):
+            if _name in observables:
+                observables[_name].set_enabled(False)
+                observables[_name].set_active(False)
 
         observables["robot0_joint_pos"]._active = True
 
