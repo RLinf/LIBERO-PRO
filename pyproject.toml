@@ -3,9 +3,9 @@ requires = ["setuptools>=64.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rlinf-libero"
-version = "0.1.1"
-description = "LIBERO: Benchmark and simulation environments for lifelong robot learning (RLinf distribution)"
+name = "rpent-libero"
+version = "0.2.0"
+description = "LIBERO benchmark environments on robosuite 1.5, for RPent (rlinf-libero stays on robosuite 1.4)"
 authors = [
     { name = "Bo Liu" },
     { name = "Yifeng Zhu" },
@@ -35,13 +35,13 @@ classifiers = [
 # fight RLinf's own torch/transformers pinning.
 dependencies = [
     # --- simulator core ---
-    "robosuite>=1.4.0,<1.5.0",
+    "robosuite>=1.5.2",
     "bddl",
-    "mujoco>=3.0.0,<3.9.0",
+    "mujoco>=3.3,<3.10",
     "gym>=0.25,<0.27",
 
     # --- numerics / io (imported at env runtime) ---
-    "numpy>=1.22,<2",
+    "numpy>=1.22",
     "imageio",
     "h5py",
     "opencv-python",
