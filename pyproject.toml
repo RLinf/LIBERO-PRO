@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlinf-liberopro"
-version = "0.1.2"
+version = "0.1.3"
 description = "LIBERO-PRO: extended LIBERO benchmark environments (RLinf distribution)"
 license = { text = "MIT" }
 readme = "README.md"
@@ -23,7 +23,7 @@ dependencies = [
     # --- simulator core ---
     "robosuite>=1.4.0,<1.5.0",
     "bddl",
-    "mujoco>=3.0.0",
+    "mujoco>=3.0.0,<3.4.0",
     "gym>=0.25,<0.27",
 
     # --- numerics / io (imported at env runtime) ---
