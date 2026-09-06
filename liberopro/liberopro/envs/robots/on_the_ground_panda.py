@@ -24,7 +24,7 @@ class OnTheGroundPanda(ManipulatorModel):
 
     @property
     def default_base(self):
-        return None
+        return "NullMount"
 
     @property
     def default_gripper(self):
