@@ -148,6 +148,8 @@ class ControlEnv:
             return
         import numpy as _np
 
+        # LIBERO-PRO placement samplers still use the legacy global RNG.
+        _np.random.seed(seed)
         self.env.seed = seed
         self.env.rng = _np.random.default_rng(seed)
 
