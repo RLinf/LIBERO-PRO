@@ -14,7 +14,7 @@ import shutil
 from liberopro.liberopro import get_libero_path
 
 try:
-    from huggingface_hub import snapshot_download
+    from huggingface_hub import HfApi, snapshot_download
     import shutil
     HUGGINGFACE_AVAILABLE = True
 except ImportError:
@@ -290,6 +290,30 @@ def assets_are_present(assets_dir=None):
     return os.path.isdir(os.path.join(assets_dir, "scenes"))
 
 
+def _verify_complete(repo_id, repo_type, root):
+    """Raise unless every file of the Hub repo exists under ``root``.
+
+    ``snapshot_download`` returns whatever snapshot is already on disk when the
+    Hub (or a mirror) cannot be reached, without checking that it is complete,
+    so an interrupted download would otherwise be linked and reported as ready.
+    """
+    # repo_info is the single request snapshot_download itself lists files with;
+    # the paginated tree API is not served by every mirror.
+    try:
+        info = HfApi().repo_info(repo_id=repo_id, repo_type=repo_type)
+    except Exception as e:  # noqa: BLE001 - cannot verify without the file list
+        raise RuntimeError(
+            f"could not list '{repo_id}' to verify the download: {e}"
+        ) from e
+    expected = [s.rfilename for s in info.siblings or [] if not s.rfilename.startswith(".git")]
+    missing = [f for f in expected if not os.path.exists(os.path.join(root, f))]
+    if missing:
+        raise RuntimeError(
+            f"incomplete download: {len(missing)} of {len(expected)} files "
+            f"missing (e.g. {missing[:3]}); rerun to resume"
+        )
+
+
 def _link_assets_dir(assets_dir, snapshot_path):
     """Make ``assets_dir`` a symlink pointing at the cached ``snapshot_path``."""
     assets_dir = os.path.abspath(assets_dir)
@@ -375,14 +399,24 @@ def libero_assets_download(
     try:
         if use_cache:
             snapshot_path = snapshot_download(repo_id=repo_id, repo_type=repo_type)
+            _verify_complete(repo_id, repo_type, snapshot_path)
             _link_assets_dir(assets_dir, snapshot_path)
         else:
-            os.makedirs(assets_dir, exist_ok=True)
+            # Download beside the target and move it into place only once it is
+            # complete, so a partial tree is never mistaken for installed assets.
+            staging = os.path.abspath(assets_dir) + ".download"
+            os.makedirs(staging, exist_ok=True)
             snapshot_download(
                 repo_id=repo_id,
                 repo_type=repo_type,
-                local_dir=assets_dir,
+                local_dir=staging,
             )
+            _verify_complete(repo_id, repo_type, staging)
+            if os.path.islink(assets_dir):
+                os.remove(assets_dir)
+            elif os.path.isdir(assets_dir):
+                shutil.rmtree(assets_dir)
+            os.replace(staging, assets_dir)
     except Exception as e:  # noqa: BLE001 - surface a clear, actionable message
         raise RuntimeError(
             f"Failed to download assets from '{repo_id}' (type '{repo_type}').\n"
